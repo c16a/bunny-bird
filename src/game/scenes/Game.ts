@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { EventBus } from '../EventBus';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
-type GameState = 'ready' | 'playing' | 'gameover';
+type GameState = 'ready' | 'playing' | 'resuming' | 'gameover';
 
 interface DifficultySettings
 {
@@ -28,6 +28,13 @@ export class Game extends Phaser.Scene
     private readonly hudTop = 90;
     private readonly hudBottom = 95;
     private readonly spawnPadding = 70;
+    private readonly maxLives = 3;
+    private lives = this.maxLives;
+    private lifeIcons: Phaser.GameObjects.Image[] = [];
+    private readonly resumeDelay = 2500;
+    private invulnerable = false;
+    private blinkEvent?: Phaser.Time.TimerEvent;
+    private invulnerabilityTimer?: Phaser.Time.TimerEvent;
 
     private readonly difficultySettings: Record<Difficulty, DifficultySettings> = {
         easy: { gap: 280, spawnDelay: 1900, speed: -190 },
@@ -63,6 +70,7 @@ export class Game extends Phaser.Scene
         this.add.rectangle(width * 0.5, height - (this.hudBottom * 0.5), width, this.hudBottom, 0x031b2b, 0.75).setDepth(5);
         this.generatePipeTexture();
         this.generateBirdTexture();
+        this.generateHeartTextures();
 
         this.pipes = this.physics.add.group({ allowGravity: false, immovable: true });
 
@@ -103,6 +111,9 @@ export class Game extends Phaser.Scene
             strokeThickness: 8
         }).setOrigin(0.5).setDepth(30).setVisible(false);
 
+        this.createLivesDisplay();
+        this.updateLivesDisplay();
+
         this.input.on('pointerdown', this.handleFlap, this);
         this.flapKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.flapKey?.on('down', this.handleFlap, this);
@@ -112,6 +123,8 @@ export class Game extends Phaser.Scene
             this.input.off('pointerdown', this.handleFlap, this);
             this.flapKey?.off('down', this.handleFlap, this);
             this.physics.world.off('worldbounds', this.handleWorldBounds, this);
+            this.blinkEvent?.remove(false);
+            this.invulnerabilityTimer?.remove(false);
         });
 
         this.resetScene();
@@ -198,17 +211,21 @@ export class Game extends Phaser.Scene
         this.state = 'ready';
         this.score = 0;
         this.readyWave = 0;
+        this.lives = this.maxLives;
+        this.clearInvulnerability();
         this.updateScoreboard();
         this.updateInstructionText();
         this.instructionText.setVisible(true);
         this.gameOverText.setVisible(false);
         this.spawnTimer?.remove(false);
+        this.spawnTimer = undefined;
         this.pipes.clear(true, true);
         this.bird.clearTint();
         this.bird.setPosition(this.scale.width * 0.35, this.getPlayCenterY());
         this.bird.setVelocity(0, 0);
         this.bird.setAngle(0);
         (this.bird.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+        this.updateLivesDisplay();
     }
 
     private spawnPipes ()
@@ -308,37 +325,219 @@ export class Game extends Phaser.Scene
         this.instructionText.setText(`Tap or press SPACE to flap\nDifficulty: ${this.difficulty.toUpperCase()}`);
     }
 
-    private handleWorldBounds = (body: Phaser.Physics.Arcade.Body) =>
+    private createLivesDisplay ()
     {
-        if (body.gameObject === this.bird)
-        {
-            this.onBirdHit();
-        }
-    };
+        this.lifeIcons.forEach((icon) => icon.destroy());
+        this.lifeIcons = [];
 
-    private onBirdHit = () =>
+        const startX = 70;
+        const spacing = 50;
+        const y = this.hudTop * 0.5;
+
+        for (let i = 0; i < this.maxLives; i++)
+        {
+            const heart = this.add.image(startX + (i * spacing), y, 'heart-full');
+            heart.setDepth(12);
+            heart.setScale(0.75);
+            this.lifeIcons.push(heart);
+        }
+    }
+
+    private updateLivesDisplay ()
     {
-        if (this.state !== 'playing')
+        if (!this.lifeIcons.length)
         {
             return;
         }
 
-        this.state = 'gameover';
-        this.spawnTimer?.remove(false);
-        this.gameOverText.setVisible(true);
-        this.bird.setTint(0xff1744);
-        this.bird.setAngle(60);
+        this.lifeIcons.forEach((icon, index) =>
+        {
+            icon.setTexture(index < this.lives ? 'heart-full' : 'heart-empty');
+        });
+    }
 
+    private handleWorldBounds = (body: Phaser.Physics.Arcade.Body) =>
+    {
+        if (body.gameObject === this.bird)
+        {
+            this.handleBirdCollision();
+        }
+    };
+
+    private onBirdHit = (_bird: Phaser.GameObjects.GameObject, collider: Phaser.GameObjects.GameObject) =>
+    {
+        this.handleBirdCollision(collider as Phaser.Physics.Arcade.Image);
+    };
+
+    private setSpawnTimerPaused (paused: boolean)
+    {
+        if (this.spawnTimer)
+        {
+            this.spawnTimer.paused = paused;
+        }
+    }
+
+    private pausePipes ()
+    {
         this.pipes.children.each((child) =>
         {
             const body = (child as Phaser.Physics.Arcade.Image).body as Phaser.Physics.Arcade.Body;
             body.setVelocityX(0);
         });
+    }
+
+    private resumePipes ()
+    {
+        this.pipes.children.each((child) =>
+        {
+            const body = (child as Phaser.Physics.Arcade.Image).body as Phaser.Physics.Arcade.Body;
+            body.setVelocityX(this.pipeSpeed);
+        });
+    }
+
+    private startBlinking ()
+    {
+        this.blinkEvent?.remove(false);
+        this.blinkEvent = this.time.addEvent({
+            delay: 140,
+            loop: true,
+            callback: () =>
+            {
+                this.bird.setVisible(!this.bird.visible);
+            }
+        });
+    }
+
+    private stopBlinking ()
+    {
+        this.blinkEvent?.remove(false);
+        this.blinkEvent = undefined;
+        this.bird.setVisible(true);
+    }
+
+    private clearInvulnerability ()
+    {
+        this.stopBlinking();
+        this.invulnerabilityTimer?.remove(false);
+        this.invulnerabilityTimer = undefined;
+        this.invulnerable = false;
+
+        if (this.bird)
+        {
+            this.bird.setVisible(true);
+            this.bird.clearTint();
+        }
+
+        this.setSpawnTimerPaused(false);
+    }
+
+    private handleBirdCollision (hitPipe?: Phaser.Physics.Arcade.Image)
+    {
+        if (this.state !== 'playing' || this.invulnerable)
+        {
+            return;
+        }
+
+        this.lives -= 1;
+        this.updateLivesDisplay();
+
+        if (this.lives <= 0)
+        {
+            this.enterGameOver();
+            return;
+        }
+
+        this.handleLifeLost(hitPipe);
+    }
+
+    private handleLifeLost (hitPipe?: Phaser.Physics.Arcade.Image)
+    {
+        this.state = 'resuming';
+        this.invulnerable = true;
+
+        const body = this.bird.body as Phaser.Physics.Arcade.Body;
+        body.setVelocity(0, 0);
+        body.setAllowGravity(false);
+        this.bird.setAngle(0);
+        this.bird.setVisible(true);
+        this.bird.setTint(0xfff082);
+
+        if (hitPipe)
+        {
+            const pipeBounds = hitPipe.getBounds();
+            const targetX = pipeBounds.left - (this.bird.displayWidth * 0.6);
+            this.bird.setX(Phaser.Math.Clamp(targetX, this.playBounds.x + 40, this.playBounds.right - 40));
+        }
+
+        this.bird.setY(Phaser.Math.Clamp(this.bird.y, this.playBounds.y + 30, this.playBounds.bottom - 30));
+
+        this.pausePipes();
+        this.setSpawnTimerPaused(true);
+        this.startBlinking();
+
+        this.invulnerabilityTimer?.remove(false);
+        this.invulnerabilityTimer = this.time.delayedCall(this.resumeDelay, this.resumeFromLifeLoss, [], this);
+    }
+
+    private resumeFromLifeLoss = () =>
+    {
+        this.invulnerabilityTimer = undefined;
+        this.stopBlinking();
+
+        const body = this.bird.body as Phaser.Physics.Arcade.Body;
+        body.setAllowGravity(true);
+        body.setVelocity(0, 0);
+        this.bird.clearTint();
+        this.bird.setVisible(true);
+
+        this.resumePipes();
+        this.setSpawnTimerPaused(false);
+
+        this.invulnerable = false;
+        this.state = 'playing';
     };
+
+    private enterGameOver ()
+    {
+        this.state = 'gameover';
+        this.spawnTimer?.remove(false);
+        this.spawnTimer = undefined;
+        this.gameOverText.setVisible(true);
+        this.bird.setTint(0xff1744);
+        this.bird.setAngle(60);
+
+        this.pausePipes();
+    }
 
     private getPlayCenterY ()
     {
         return this.playBounds.y + (this.playBounds.height * 0.5);
+    }
+
+    private generateHeartTextures ()
+    {
+        this.generateHeartTexture('heart-full', 0xff4f5f);
+        this.generateHeartTexture('heart-empty', 0x6b7c8b);
+    }
+
+    private generateHeartTexture (key: string, color: number)
+    {
+        if (this.textures.exists(key))
+        {
+            return;
+        }
+
+        const width = 48;
+        const height = 40;
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        graphics.fillStyle(color, 1);
+        graphics.fillCircle(width * 0.32, height * 0.35, width * 0.18);
+        graphics.fillCircle(width * 0.68, height * 0.35, width * 0.18);
+        graphics.fillTriangle(width * 0.08, height * 0.4, width * 0.92, height * 0.4, width * 0.5, height * 0.92);
+
+        graphics.generateTexture(key, width, height);
+        graphics.destroy();
     }
 
     private generatePipeTexture ()
