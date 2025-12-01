@@ -24,6 +24,10 @@ export class Game extends Phaser.Scene
     private state: GameState = 'ready';
     private spawnTimer?: Phaser.Time.TimerEvent;
     private readyWave = 0;
+    private playBounds!: Phaser.Geom.Rectangle;
+    private readonly hudTop = 90;
+    private readonly hudBottom = 95;
+    private readonly spawnPadding = 70;
 
     private readonly difficultySettings: Record<Difficulty, DifficultySettings> = {
         easy: { gap: 280, spawnDelay: 1900, speed: -190 },
@@ -49,51 +53,55 @@ export class Game extends Phaser.Scene
     create ()
     {
         const { width, height } = this.scale;
+        const playHeight = height - this.hudTop - this.hudBottom;
+        const playCenterY = this.hudTop + (playHeight * 0.5);
+
+        this.playBounds = new Phaser.Geom.Rectangle(0, this.hudTop, width, playHeight);
 
         this.add.image(width * 0.5, height * 0.5, 'background').setDisplaySize(width, height);
+        this.add.rectangle(width * 0.5, this.hudTop * 0.5, width, this.hudTop, 0x031b2b, 0.75).setDepth(5);
+        this.add.rectangle(width * 0.5, height - (this.hudBottom * 0.5), width, this.hudBottom, 0x031b2b, 0.75).setDepth(5);
         this.generatePipeTexture();
         this.generateBirdTexture();
 
         this.pipes = this.physics.add.group({ allowGravity: false, immovable: true });
 
-        this.bird = this.physics.add.sprite(width * 0.35, height * 0.5, 'bird');
+        this.bird = this.physics.add.sprite(width * 0.35, playCenterY, 'bird');
         this.bird.setScale(0.95);
         this.bird.setCollideWorldBounds(true);
-        
         const body = this.bird.body as Phaser.Physics.Arcade.Body;
-        
         body.setAllowGravity(false);
         body.onWorldBounds = true;
 
-        this.physics.world.setBounds(0, 0, width, height);
+        this.physics.world.setBounds(this.playBounds.x, this.playBounds.y, this.playBounds.width, this.playBounds.height);
         this.physics.add.collider(this.bird, this.pipes, this.onBirdHit, undefined, this);
         this.physics.world.on('worldbounds', this.handleWorldBounds, this);
 
-        this.scoreText = this.add.text(16, 16, '', {
+        this.scoreText = this.add.text(width * 0.5, this.hudTop * 0.5, '', {
             fontFamily: 'Arial Black',
             fontSize: '32px',
             color: '#ffffff',
             stroke: '#000000',
             strokeThickness: 6
-        });
+        }).setOrigin(0.5).setDepth(10);
 
-        this.instructionText = this.add.text(width * 0.5, height * 0.65, '', {
+        this.instructionText = this.add.text(width * 0.5, height - (this.hudBottom * 0.5), '', {
             fontFamily: 'Arial Black',
-            fontSize: '32px',
+            fontSize: '24px',
             color: '#ffffff',
             stroke: '#000000',
             strokeThickness: 6,
             align: 'center'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(10);
 
-        this.gameOverText = this.add.text(width * 0.5, height * 0.5, 'Game Over\nClick to try again', {
+        this.gameOverText = this.add.text(width * 0.5, playCenterY, 'Game Over\nClick to try again', {
             fontFamily: 'Arial Black',
             fontSize: '48px',
             align: 'center',
             color: '#ffeb3b',
             stroke: '#000000',
             strokeThickness: 8
-        }).setOrigin(0.5).setVisible(false);
+        }).setOrigin(0.5).setDepth(30).setVisible(false);
 
         this.input.on('pointerdown', this.handleFlap, this);
         this.flapKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -116,7 +124,7 @@ export class Game extends Phaser.Scene
         if (this.state === 'ready')
         {
             this.readyWave += delta * 0.005;
-            this.bird.y = (this.scale.height * 0.5) + Math.sin(this.readyWave) * 12;
+            this.bird.y = this.getPlayCenterY() + Math.sin(this.readyWave) * 12;
             return;
         }
 
@@ -197,7 +205,7 @@ export class Game extends Phaser.Scene
         this.spawnTimer?.remove(false);
         this.pipes.clear(true, true);
         this.bird.clearTint();
-        this.bird.setPosition(this.scale.width * 0.35, this.scale.height * 0.5);
+        this.bird.setPosition(this.scale.width * 0.35, this.getPlayCenterY());
         this.bird.setVelocity(0, 0);
         this.bird.setAngle(0);
         (this.bird.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
@@ -210,8 +218,10 @@ export class Game extends Phaser.Scene
             return;
         }
 
-        const { width, height } = this.scale;
-        const centerY = Phaser.Math.Between(140, height - 140);
+        const { width } = this.scale;
+        const minY = this.playBounds.y + this.spawnPadding;
+        const maxY = this.playBounds.bottom - this.spawnPadding;
+        const centerY = Phaser.Math.Between(minY, maxY);
         const pipeX = width + 80;
 
         const topPipe = this.createPipe(pipeX, centerY - (this.gapSize * 0.5), true);
@@ -295,7 +305,7 @@ export class Game extends Phaser.Scene
             return;
         }
 
-        this.instructionText.setText(`Click or press SPACE to flap\nDifficulty: ${this.difficulty.toUpperCase()}`);
+        this.instructionText.setText(`Tap or press SPACE to flap\nDifficulty: ${this.difficulty.toUpperCase()}`);
     }
 
     private handleWorldBounds = (body: Phaser.Physics.Arcade.Body) =>
@@ -325,6 +335,11 @@ export class Game extends Phaser.Scene
             body.setVelocityX(0);
         });
     };
+
+    private getPlayCenterY ()
+    {
+        return this.playBounds.y + (this.playBounds.height * 0.5);
+    }
 
     private generatePipeTexture ()
     {
