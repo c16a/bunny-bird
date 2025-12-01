@@ -89,7 +89,7 @@ export class Game extends Phaser.Scene
         body.setAllowGravity(false);
         body.onWorldBounds = true;
 
-        this.physics.world.setBounds(this.playBounds.x, this.playBounds.y, this.playBounds.width, this.playBounds.height);
+        this.physics.world.setBounds(0, 0, width, height);
         this.physics.add.collider(this.bird, this.pipes, this.onBirdHit, undefined, this);
         this.physics.world.on('worldbounds', this.handleWorldBounds, this);
 
@@ -557,7 +557,9 @@ export class Game extends Phaser.Scene
             this.bird.setX(Phaser.Math.Clamp(targetX, this.playBounds.x + 40, this.playBounds.right - 40));
         }
 
-        this.bird.setY(Phaser.Math.Clamp(this.bird.y, this.playBounds.y + 30, this.playBounds.bottom - 30));
+        const safeTop = 30;
+        const safeBottom = this.scale.height - 30;
+        this.bird.setY(Phaser.Math.Clamp(this.bird.y, safeTop, safeBottom));
 
         this.pausePipes();
         this.setSpawnTimerPaused(true);
