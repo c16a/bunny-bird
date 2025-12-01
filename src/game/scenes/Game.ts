@@ -11,6 +11,13 @@ interface DifficultySettings
     speed: number;
 }
 
+interface DifficultyButton
+{
+    container: Phaser.GameObjects.Container;
+    background: Phaser.GameObjects.Rectangle;
+    label: Phaser.GameObjects.Text;
+}
+
 export class Game extends Phaser.Scene
 {
     private bird!: Phaser.Physics.Arcade.Sprite;
@@ -35,6 +42,7 @@ export class Game extends Phaser.Scene
     private invulnerable = false;
     private blinkEvent?: Phaser.Time.TimerEvent;
     private invulnerabilityTimer?: Phaser.Time.TimerEvent;
+    private difficultyButtons: Partial<Record<Difficulty, DifficultyButton>> = {};
 
     private readonly difficultySettings: Record<Difficulty, DifficultySettings> = {
         easy: { gap: 280, spawnDelay: 1900, speed: -190 },
@@ -113,6 +121,8 @@ export class Game extends Phaser.Scene
 
         this.createLivesDisplay();
         this.updateLivesDisplay();
+        this.createDifficultyButtons();
+        this.refreshDifficultyButtons();
 
         this.input.on('pointerdown', this.handleFlap, this);
         this.flapKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -194,6 +204,7 @@ export class Game extends Phaser.Scene
     private startRun ()
     {
         this.state = 'playing';
+        this.updateDifficultyButtonsVisibility();
         this.instructionText.setVisible(false);
         const body = this.bird.body as Phaser.Physics.Arcade.Body;
         body.setAllowGravity(true);
@@ -226,6 +237,7 @@ export class Game extends Phaser.Scene
         this.bird.setAngle(0);
         (this.bird.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
         this.updateLivesDisplay();
+        this.refreshDifficultyButtons();
     }
 
     private spawnPipes ()
@@ -322,7 +334,82 @@ export class Game extends Phaser.Scene
             return;
         }
 
-        this.instructionText.setText(`Tap or press SPACE to flap\nDifficulty: ${this.difficulty.toUpperCase()}`);
+        // this.instructionText.setText(`Tap or press SPACE to flap\nDifficulty: ${this.difficulty.toUpperCase()}`);
+    }
+
+    private createDifficultyButtons ()
+    {
+        const options: Difficulty[] = ['easy', 'medium', 'hard'];
+        const buttonWidth = 140;
+        const buttonHeight = 46;
+        const spacing = 18;
+        const totalWidth = (buttonWidth * options.length) + (spacing * (options.length - 1));
+        const startX = (this.scale.width * 0.5) - (totalWidth * 0.5) + (buttonWidth * 0.5);
+        const y = this.scale.height - this.hudBottom + 30;
+
+        options.forEach((level, index) =>
+        {
+            const x = startX + index * (buttonWidth + spacing);
+            const container = this.add.container(x, y).setDepth(16);
+            const background = this.add.rectangle(0, 0, buttonWidth, buttonHeight, 0x0b2033, 0.8);
+            background.setStrokeStyle(3, 0xffffff, 0.5);
+            const label = this.add.text(0, 0, level.toUpperCase(), {
+                fontFamily: 'Arial Black',
+                fontSize: '20px',
+                color: '#ffffff'
+            }).setOrigin(0.5);
+
+            container.add([background, label]);
+            container.setSize(buttonWidth, buttonHeight);
+            container.setInteractive({ useHandCursor: true });
+            container.on('pointerdown', () => this.handleDifficultyButtonPress(level));
+
+            this.difficultyButtons[level] = { container, background, label };
+        });
+    }
+
+    private handleDifficultyButtonPress (level: Difficulty)
+    {
+        if (this.state === 'playing' || this.state === 'resuming')
+        {
+            return;
+        }
+
+        this.setDifficulty(level);
+    }
+
+    private updateDifficultyButtonStyles ()
+    {
+        Object.entries(this.difficultyButtons).forEach(([level, buttonEntry]) =>
+        {
+            if (!buttonEntry)
+            {
+                return;
+            }
+
+            const { background, label } = buttonEntry;
+            const typedLevel = level as Difficulty;
+            const isActive = typedLevel === this.difficulty;
+            background.setFillStyle(isActive ? 0xffbe0b : 0x0b2033, isActive ? 1 : 0.8);
+            background.setStrokeStyle(3, 0xffffff, isActive ? 1 : 0.35);
+            label.setColor(isActive ? '#0b1726' : '#ffffff');
+            label.setAlpha(isActive ? 1 : 0.85);
+        });
+    }
+
+    private updateDifficultyButtonsVisibility ()
+    {
+        const show = this.state !== 'playing' && this.state !== 'resuming';
+        Object.values(this.difficultyButtons).forEach((entry) =>
+        {
+            entry?.container.setVisible(show);
+        });
+    }
+
+    private refreshDifficultyButtons ()
+    {
+        this.updateDifficultyButtonStyles();
+        this.updateDifficultyButtonsVisibility();
     }
 
     private createLivesDisplay ()
@@ -453,6 +540,7 @@ export class Game extends Phaser.Scene
     private handleLifeLost (hitPipe?: Phaser.Physics.Arcade.Image)
     {
         this.state = 'resuming';
+        this.updateDifficultyButtonsVisibility();
         this.invulnerable = true;
 
         const body = this.bird.body as Phaser.Physics.Arcade.Body;
@@ -495,11 +583,13 @@ export class Game extends Phaser.Scene
 
         this.invulnerable = false;
         this.state = 'playing';
+        this.updateDifficultyButtonsVisibility();
     };
 
     private enterGameOver ()
     {
         this.state = 'gameover';
+        this.updateDifficultyButtonsVisibility();
         this.spawnTimer?.remove(false);
         this.spawnTimer = undefined;
         this.gameOverText.setVisible(true);
