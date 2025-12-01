@@ -1,0 +1,103 @@
+body {
+    margin: 0;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.92);
+    background-color: #0b1726;
+    font-family: 'Arial', Helvetica, sans-serif;
+}
+
+#app {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    text-align: center;
+    padding: 2rem 1rem;
+    box-sizing: border-box;
+}
+
+#game-container {
+    width: min(100%, 960px);
+    display: flex;
+    justify-content: center;
+}
+
+#game-container canvas {
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    width: 100%;
+    height: auto;
+    max-height: 80vh;
+    touch-action: none;
+    cursor: pointer;
+}
+
+.info-panel {
+    max-width: 560px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    line-height: 1.5;
+}
+
+.info-panel p {
+    margin: 0.25rem 0;
+}
+
+.difficulty-controls {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.difficulty-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.difficulty-buttons button {
+    padding: 0.35rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.87);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.difficulty-buttons button.active {
+    background-color: #ffb703;
+    border-color: #ffb703;
+    color: #0b1726;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.difficulty-buttons button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.difficulty-controls small {
+    color: rgba(255, 255, 255, 0.65);
+}
+
+@media (max-width: 900px) {
+    #app {
+        height: auto;
+        padding: 1.5rem 1rem 3rem;
+    }
+
+    #game-container canvas {
+        max-height: none;
+    }
+}
