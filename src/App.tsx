@@ -14,6 +14,26 @@ function App()
 
     useEffect(() =>
     {
+        const updateViewportVars = () =>
+        {
+            const root = document.documentElement;
+            root.style.setProperty('--viewport-height', `${window.innerHeight}px`);
+            root.style.setProperty('--viewport-width', `${window.innerWidth}px`);
+        };
+
+        updateViewportVars();
+        window.addEventListener('resize', updateViewportVars);
+        window.addEventListener('orientationchange', updateViewportVars);
+
+        return () =>
+        {
+            window.removeEventListener('resize', updateViewportVars);
+            window.removeEventListener('orientationchange', updateViewportVars);
+        };
+    }, []);
+
+    useEffect(() =>
+    {
         if (!activeScene)
         {
             return;

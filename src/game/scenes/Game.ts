@@ -345,7 +345,7 @@ export class Game extends Phaser.Scene
         const spacing = 18;
         const totalWidth = (buttonWidth * options.length) + (spacing * (options.length - 1));
         const startX = (this.scale.width * 0.5) - (totalWidth * 0.5) + (buttonWidth * 0.5);
-        const y = this.scale.height - this.hudBottom + 30;
+        const y = this.scale.height - (this.hudBottom * 0.5);
 
         options.forEach((level, index) =>
         {
@@ -659,19 +659,19 @@ export class Game extends Phaser.Scene
         const height = 72;
         const graphics = this.make.graphics({ x: 0, y: 0 });
 
-        graphics.fillStyle(0xffd86b, 1);
+        graphics.fillStyle(0x9c27b0, 1);
         graphics.fillEllipse(width * 0.45, height * 0.55, width * 0.7, height * 0.7);
 
-        graphics.fillStyle(0xf6a742, 1);
+        graphics.fillStyle(0x7b1fa2, 1);
         graphics.fillEllipse(width * 0.35, height * 0.52, width * 0.5, height * 0.35);
 
-        graphics.fillStyle(0xfff8d7, 1);
+        graphics.fillStyle(0xf3e5f5, 1);
         graphics.fillEllipse(width * 0.53, height * 0.58, width * 0.4, height * 0.3);
 
-        graphics.fillStyle(0xe36414, 1);
+        graphics.fillStyle(0xffb74d, 1);
         graphics.fillTriangle(width * 0.78, height * 0.47, width * 0.96, height * 0.53, width * 0.78, height * 0.59);
 
-        graphics.fillStyle(0xffd86b, 1);
+        graphics.fillStyle(0xba68c8, 1);
         graphics.fillRoundedRect(width * 0.08, height * 0.5, width * 0.18, height * 0.18, 16);
 
         graphics.fillStyle(0x000000, 1);

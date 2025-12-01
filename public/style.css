@@ -1,3 +1,8 @@
+:root {
+    --viewport-height: 100vh;
+    --viewport-width: 100vw;
+}
+
 html,
 body {
     height: 100%;
@@ -13,8 +18,8 @@ body {
 }
 
 #app {
-    width: 100%;
-    height: 100%;
+    width: var(--viewport-width);
+    height: var(--viewport-height);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -22,8 +27,8 @@ body {
 }
 
 #game-container {
-    width: 100%;
-    height: 100%;
+    width: var(--viewport-width);
+    height: var(--viewport-height);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -33,10 +38,12 @@ body {
     border: 4px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
-    width: 100vw;
-    height: 100vh;
-    max-width: 100vw;
-    max-height: 100vh;
+    width: var(--viewport-width);
+    height: var(--viewport-height);
+    max-width: var(--viewport-width);
+    max-height: var(--viewport-height);
+    display: block;
+    margin: 0 auto;
     touch-action: none;
     cursor: pointer;
 }
